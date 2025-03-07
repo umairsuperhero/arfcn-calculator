@@ -5,16 +5,150 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WiFrost gNB Configuration Tool</title>
     <style>
-        /* We’ll add CSS here later */
-    </style>
+        body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+h2 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    color: #0055A4; /* WiFrost blue */
+}
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+select, input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+span {
+    font-size: 12px;
+    color: #666;
+    display: block;
+    margin-bottom: 10px;
+}
+button {
+    width: 100%;
+    padding: 10px;
+    background-color: #0055A4; /* WiFrost blue */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+button:hover {
+    background-color: #003366;
+}
+#output {
+    margin-top: 20px;
+    font-size: 1.1em;
+    color: #333;
+}
+.error {
+    color: #d9534f;
+}    </style>
 </head>
 <body>
     <div class="container">
-        <h2>WiFrost gNB Configuration Tool</h2>
+        <h2><label for="freqBand">Frequency Band:</label>
+<select id="freqBand">
+    <option value="n38">n38 (2570-2620 MHz)</option>
+    <option value="n41">n41 (2496-2690 MHz)</option>
+    <option value="n77">n77 (3300-4200 MHz)</option>
+    <option value="n78">n78 (3300-3800 MHz)</option>
+    <option value="B48">B48 (3550-3700 MHz)</option>
+</select>
+<span id="freqBandDesc">Select the frequency band for your gNB.</span>
+
+<label for="bandwidth">Bandwidth (MHz):</label>
+<select id="bandwidth">
+    <option value="10">10</option>
+    <option value="20">20</option>
+    <option value="30">30</option>
+    <option value="40">40</option>
+    <option value="50">50</option>
+    <option value="60">60</option>
+    <option value="70">70</option>
+    <option value="80">80</option>
+    <option value="90">90</option>
+    <option value="100">100</option>
+</select>
+<span id="bandwidthDesc">Select the bandwidth in MHz.</span>
+
+<label for="centerFreq">Center Frequency (MHz):</label>
+<input type="number" id="centerFreq" step="0.001" min="0" required>
+<span id="centerFreqDesc">Enter the center frequency in MHz.</span>
+
+<button onclick="calculate()">Calculate</button>
+
+<div id="output"></div></h2>
         <!-- Form elements will go here -->
     </div>
     <script>
-        // JavaScript code will go here
+        function calculate() {
+    const freqBand = document.getElementById('freqBand').value;
+    const bandwidth = parseInt(document.getElementById('bandwidth').value);
+    const centerFreq = parseFloat(document.getElementById('centerFreq').value);
+    const outputDiv = document.getElementById('output');
+
+    // Check if all fields are filled
+    if (!freqBand || isNaN(bandwidth) || isNaN(centerFreq)) {
+        outputDiv.innerHTML = '<span class="error">Please fill in all fields correctly.</span>';
+        return;
+    }
+
+    // Simplified ARFCN calculation (example for n78)
+    // Note: Real formulas vary by band; this is a placeholder
+    const arfcn = Math.floor((centerFreq - 3000) / 0.015) + 600000;
+
+    // Generate GSCN and SSB frequency options (simplified example)
+    const gscnOptions = generateGSCNOptions(freqBand, bandwidth);
+
+    // Display results
+    outputDiv.innerHTML = `
+        <strong>ARFCN:</strong> ${arfcn}<br>
+        <strong>Select GSCN for SSB Absolute Frequency:</strong><br>
+        <select id="gscnSelect">
+            ${gscnOptions.map(opt => `<option value="${opt.gscn}">${opt.gscn} - ${opt.freq} MHz</option>`).join('')}
+        </select>
+    `;
+
+    // Update output when GSCN is selected
+    document.getElementById('gscnSelect').addEventListener('change', function() {
+        const selectedGSCN = this.value;
+        const selectedFreq = gscnOptions.find(opt => opt.gscn === selectedGSCN).freq;
+        outputDiv.innerHTML += `<br><strong>Selected SSB Absolute Frequency:</strong> ${selectedFreq} MHz`;
+    });
+}
+
+// Placeholder function for GSCN options
+function generateGSCNOptions(band, bandwidth) {
+    const gscnList = [];
+    // Example values; in reality, use 3GPP GSCN tables
+    for (let i = 0; i < 5; i++) {
+        const gscn = 7798 + i; // Example GSCN
+        const freq = 3300 + i * 1.44; // Example SSB frequency
+        gscnList.push({ gscn, freq: freq.toFixed(2) });
+    }
+    return gscnList;
+}
     </script>
 </body>
 </html>
