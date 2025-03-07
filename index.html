@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARFCN Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #output {
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .error {
+            color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>ARFCN Calculator for gNB</h2>
+        <label for="frequency">Center Frequency (MHz):</label>
+        <input type="number" id="frequency" step="0.001" min="0" required placeholder="e.g., 3500">
+        <label for="bandwidth">Bandwidth (MHz):</label>
+        <input type="number" id="bandwidth" step="1" min="5" required placeholder="e.g., 20">
+        <button onclick="calculate()">Calculate</button>
+        <div id="output"></div>
+    </div>
+    <script>
+        function calculate() {
+            const freq = parseFloat(document.getElementById('frequency').value);
+            const bw = parseFloat(document.getElementById('bandwidth').value);
+            let arfcn;
+
+            // Calculate ARFCN based on 5G NR frequency ranges (3GPP TS 38.104)
+            if (freq < 3000) {
+                arfcn = Math.floor(freq / 0.005); // ΔF_Global = 5 kHz
+            } else if (freq < 24250) {
+                arfcn = 600000 + Math.floor((freq - 3000) / 0.015); // ΔF_Global = 15 kHz
+            } else {
+                arfcn = 2016667 + Math.floor((freq - 24250.08) / 0.06); // ΔF_Global = 60 kHz
+            }
+
+            // Validate bandwidth against standard 5G NR FR1 bandwidths
+            const validBandwidths = [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100];
+            const outputDiv = document.getElementById('output');
+
+            if (validBandwidths.includes(bw)) {
+                outputDiv.innerHTML = `ARFCN: ${arfcn}<br>Bandwidth: ${bw} MHz`;
+                outputDiv.classList.remove('error');
+            } else {
+                outputDiv.innerHTML = `Error: Invalid bandwidth. Must be one of: ${validBandwidths.join(', ')} MHz`;
+                outputDiv.classList.add('error');
+            }
+        }
+    </script>
+</body>
+</html>
