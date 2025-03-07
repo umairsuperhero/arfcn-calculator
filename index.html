@@ -13,7 +13,7 @@
             background-color: #f5f5f5;
         }
         header {
-            background-color: #FFFFFF; /* White background for contrast */
+            background-color: #FFFFFF; /* White background for logo visibility */
             padding: 10px;
             text-align: left;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -133,60 +133,84 @@
             const optimization = document.getElementById('optimization').value;
             const outputDiv = document.getElementById('output');
 
+            // Input validation
             if (!freqBand || isNaN(bandwidth) || isNaN(centerFreq)) {
                 outputDiv.innerHTML = '<span class="error">Please fill in all fields correctly.</span>';
                 return;
             }
 
-            // Calculate ARFCN (simplified for n78)
-            const arfcn = Math.floor((centerFreq - 3000) / 0.015) + 600000;
+            // Define frequency band ranges (MHz)
+            const bandRanges = {
+                'n38': { min: 2570, max: 2620 },
+                'n41': { min: 2496, max: 2690 },
+                'n77': { min: 3300, max: 4200 },
+                'n78': { min: 3300, max: 3800 },
+                'B48': { min: 3550, max: 3700 }
+            };
+
+            const band = bandRanges[freqBand];
+            if (centerFreq < band.min || centerFreq > band.max) {
+                outputDiv.innerHTML = `<span class="error">Center frequency must be within ${band.min} - ${band.max} MHz for ${freqBand}.</span>`;
+                return;
+            }
 
             // Calculate channel range
             const startFreq = centerFreq - bandwidth / 2;
             const endFreq = centerFreq + bandwidth / 2;
 
-            // Generate GSCN options (simplified example)
+            if (startFreq < band.min || endFreq > band.max) {
+                outputDiv.innerHTML = `<span class="error">Channel range (${startFreq.toFixed(2)} - ${endFreq.toFixed(2)} MHz) exceeds ${freqBand} limits (${band.min} - ${band.max} MHz).</span>`;
+                return;
+            }
+
+            // Calculate ARFCN for the center frequency (simplified for 5G NR)
+            const arfcn = Math.floor((centerFreq - 3000) / 0.015) + 600000;
+
+            // Generate GSCN options based on band and range
             const gscnOptions = [];
-            for (let i = 0; i < 5; i++) {
-                const gscn = 7798 + i;
-                const ssbFreq = 3000 + (gscn - 7499) * 1.44;
+            const gscnBase = freqBand === 'n78' || freqBand === 'n77' ? 7499 : 7499; // Adjust base for different bands if needed
+            for (let i = 0; i < 30; i++) {
+                const gscn = gscnBase + i;
+                const ssbFreq = 3000 + (gscn - 7499) * 1.44; // Simplified SSB frequency calculation (MHz)
                 if (ssbFreq >= startFreq && ssbFreq <= endFreq) {
-                    gscnOptions.push({ gscn, ssbFreq: ssbFreq.toFixed(2) });
+                    const ssbArfcn = Math.floor((ssbFreq - 3000) / 0.015) + 600000;
+                    gscnOptions.push({ gscn, ssbFreq: ssbFreq.toFixed(2), ssbArfcn });
                 }
             }
 
-            // Filter GSCN based on optimization
+            if (gscnOptions.length === 0) {
+                outputDiv.innerHTML = '<span class="error">No valid GSCN options found within the channel range.</span>';
+                return;
+            }
+
+            // Filter GSCN based on optimization goal
             let filteredGSCN = optimization === 'coverage'
-                ? gscnOptions.sort((a, b) => a.ssbFreq - b.ssbFreq).slice(0, 3)
-                : gscnOptions.sort((a, b) => b.ssbFreq - a.ssbFreq).slice(0, 3);
+                ? gscnOptions.sort((a, b) => a.ssbFreq - b.ssbFreq).slice(0, Math.min(5, gscnOptions.length)) // Lower frequencies for coverage
+                : gscnOptions.sort((a, b) => b.ssbFreq - a.ssbFreq).slice(0, Math.min(5, gscnOptions.length)); // Higher frequencies for capacity
 
             // Display results
             outputDiv.innerHTML = `
-                <strong>ARFCN:</strong> ${arfcn}<br>
+                <strong>Carrier ARFCN:</strong> ${arfcn}<br>
                 <strong>Channel Range:</strong> ${startFreq.toFixed(2)} - ${endFreq.toFixed(2)} MHz<br>
                 <label for="gscnSelect">Select GSCN: <span title="GSCN sets the SSB frequency for network synchronization. Choose based on your optimization goal.">ⓘ</span></label>
                 <select id="gscnSelect">
-                    ${filteredGSCN.map(opt => `<option value="${opt.gscn}">${opt.gscn} - ${opt.ssbFreq} MHz</option>`).join('')}
+                    ${filteredGSCN.map(opt => `<option value="${opt.gscn}" data-ssb-arfcn="${opt.ssbArfcn}">${opt.gscn} - ${opt.ssbFreq} MHz</option>`).join('')}
                 </select>
-                <div id="ssbValidation"></div>
+                <div id="ssbOutput"><strong>SSBFrequency (ARFCN):</strong> ${filteredGSCN[0].ssbArfcn} (SSB Freq: ${filteredGSCN[0].ssbFreq} MHz)</div>
             `;
 
             // Add event listener for GSCN selection
             document.getElementById('gscnSelect').addEventListener('change', function() {
                 const selectedGSCN = this.value;
-                const selectedSSBFreq = filteredGSCN.find(opt => opt.gscn == selectedGSCN).ssbFreq;
-                const validationDiv = document.getElementById('ssbValidation');
-                if (selectedSSBFreq >= startFreq && selectedSSBFreq <= endFreq) {
-                    validationDiv.innerHTML = `<span style="color: green;">Valid SSB frequency: ${selectedSSBFreq} MHz</span>`;
-                } else {
-                    validationDiv.innerHTML = `<span style="color: red;">Warning: SSB frequency outside channel range.</span>`;
-                }
+                const selectedOption = filteredGSCN.find(opt => opt.gscn == selectedGSCN);
+                const ssbOutputDiv = document.getElementById('ssbOutput');
+                ssbOutputDiv.innerHTML = `<strong>SSBFrequency (ARFCN):</strong> ${selectedOption.ssbArfcn} (SSB Freq: ${selectedOption.ssbFreq} MHz)`;
             });
 
             // Add guidance text
             const guidance = optimization === 'coverage'
-                ? "Choose a lower frequency (e.g., 3300.00 MHz) for better coverage."
-                : "Choose a higher frequency (e.g., 3350.00 MHz) for improved capacity.";
+                ? "Choose a lower frequency for better coverage."
+                : "Choose a higher frequency for improved capacity.";
             outputDiv.innerHTML += `<p style="font-size: 12px; color: #666;">${guidance}</p>`;
         }
     </script>
